@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piano Virtual</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <!-- Tone.js para samples de piano real -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        :root {
+            --bg-primary: #1a1d24;
+            --bg-secondary: #252a33;
+            --bg-card: #2d333d;
+            --accent-blue: #4a9eff;
+            --accent-purple: #a855f7;
+            --accent-teal: #2dd4bf;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --white-key-bg: linear-gradient(180deg, #ffffff 0%, #f8f9fa 60%, #e9ecef 100%);
+            --white-key-active: linear-gradient(180deg, #dbeafe 0%, #93c5fd 60%, #60a5fa 100%);
+            --black-key-bg: linear-gradient(180deg, #374151 0%, #1f2937 40%, #111827 100%);
+            --black-key-active: linear-gradient(180deg, #7c3aed 0%, #5b21b6 40%, #4c1d95 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            background-image: 
+                radial-gradient(ellipse at 30% 0%, rgba(74, 158, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 100%, rgba(168, 85, 247, 0.06) 0%, transparent 50%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text-primary);
+            overflow-x: hidden;
+            padding: 1rem;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 100%;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(26, 29, 36, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--bg-card);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 1.5rem;
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .loading-progress {
+            margin-top: 0.5rem;
+            color: var(--accent-teal);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        /* Start Button */
+        .start-btn {
+            display: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .start-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(74, 158, 255, 0.3);
+        }
+
+        .start-btn.show {
+            display: block;
+        }
+
+        /* Painel de Controles */
+        .controls-panel {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .control-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Toggle Switch */
+        .toggle-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .toggle-option {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            transition: color 0.2s;
+            cursor: pointer;
+        }
+
+        .toggle-option.active {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: var(--bg-secondary);
+            border-radius: 26px;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(22px);
+            background: var(--accent-purple);
+        }
+
+        /* Controle de Oitava */
+        .octave-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .octave-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 1.2rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .octave-btn:hover:not(:disabled) {
+            background: var(--accent-blue);
+            transform: scale(1.05);
+        }
+
+        .octave-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .octave-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--accent-teal);
+            min-width: 40px;
+            text-align: center;
+        }
+
+        /* Controle de Volume */
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .volume-icon {
+            font-size: 1.1rem;
+        }
+
+        .volume-slider {
+            -webkit-appearance: none;
+            width: 80px;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--bg-secondary);
+            outline: none;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-teal);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .volume-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .volume-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-teal);
+            cursor: pointer;
+            border: none;
+        }
+
+        /* Piano Container */
+        .piano-container {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 20px 24px 16px;
+            box-shadow: 
+                0 25px 50px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            overflow-x: auto;
+        }
+
+        .piano {
+            display: flex;
+            position: relative;
+            min-width: max-content;
+        }
+
+        .key {
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            user-select: none;
+            transition: all 0.06s ease;
+        }
+
+        .key-white {
+            width: 54px;
+            height: 180px;
+            background: var(--white-key-bg);
+            border: 1px solid #d1d5db;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            margin: 0 1px;
+            z-index: 1;
+            padding-bottom: 12px;
+            box-shadow: 
+                0 4px 8px rgba(0, 0, 0, 0.2),
+                inset 0 -2px 6px rgba(0, 0, 0, 0.08);
+        }
+
+        .key-white:hover {
+            background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 60%, #e2e8f0 100%);
+        }
+
+        .key-white.active {
+            background: var(--white-key-active);
+            transform: translateY(2px);
+            box-shadow: 
+                0 2px 4px rgba(0, 0, 0, 0.15),
+                inset 0 -1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .key-white .note-label {
+            color: #475569;
+            font-size: 0.7rem;
+            margin-bottom: 2px;
+        }
+
+        .key-white .key-label {
+            color: #64748b;
+            font-size: 0.65rem;
+            background: rgba(0, 0, 0, 0.06);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .key-white.active .note-label {
+            color: #1e40af;
+        }
+
+        .key-white.active .key-label {
+            background: rgba(30, 64, 175, 0.15);
+            color: #1e40af;
+        }
+
+        .key-black {
+            width: 36px;
+            height: 110px;
+            background: var(--black-key-bg);
+            border: none;
+            border-radius: 0 0 6px 6px;
+            position: absolute;
+            top: 0;
+            z-index: 2;
+            padding-bottom: 8px;
+            box-shadow: 
+                0 4px 10px rgba(0, 0, 0, 0.5),
+                inset 0 -2px 4px rgba(255, 255, 255, 0.05);
+        }
+
+        .key-black:hover {
+            background: linear-gradient(180deg, #4b5563 0%, #374151 40%, #1f2937 100%);
+        }
+
+        .key-black.active {
+            background: var(--black-key-active);
+            transform: translateY(2px);
+            box-shadow: 
+                0 2px 5px rgba(0, 0, 0, 0.4),
+                inset 0 -1px 2px rgba(255, 255, 255, 0.03);
+        }
+
+        .key-black .note-label {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.6rem;
+            margin-bottom: 2px;
+        }
+
+        .key-black .key-label {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.55rem;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        .key-black.active .note-label {
+            color: #fff;
+        }
+
+        .key-black.active .key-label {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+        }
+
+        /* Posições das teclas pretas - 3 oitavas */
+        .key-black[data-note-index="1"] { left: 40px; }
+        .key-black[data-note-index="3"] { left: 96px; }
+        .key-black[data-note-index="6"] { left: 208px; }
+        .key-black[data-note-index="8"] { left: 264px; }
+        .key-black[data-note-index="10"] { left: 320px; }
+        
+        .key-black[data-note-index="13"] { left: 432px; }
+        .key-black[data-note-index="15"] { left: 488px; }
+        .key-black[data-note-index="18"] { left: 600px; }
+        .key-black[data-note-index="20"] { left: 656px; }
+        .key-black[data-note-index="22"] { left: 712px; }
+        
+        .key-black[data-note-index="25"] { left: 824px; }
+        .key-black[data-note-index="27"] { left: 880px; }
+        .key-black[data-note-index="30"] { left: 992px; }
+        .key-black[data-note-index="32"] { left: 1048px; }
+        .key-black[data-note-index="34"] { left: 1104px; }
+
+        /* Instruções */
+        .instructions {
+            margin-top: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .instruction-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            flex-wrap: wrap;
+        }
+
+        .instruction-row kbd {
+            background: var(--bg-card);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .keyboard-hint {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        /* Responsivo */
+        @media (max-width: 900px) {
+            .piano-container {
+                padding: 15px 15px 12px;
+            }
+            
+            .key-white {
+                width: 44px;
+                height: 150px;
+            }
+            
+            .key-black {
+                width: 30px;
+                height: 90px;
+            }
+
+            .key-black[data-note-index="1"] { left: 32px; }
+            .key-black[data-note-index="3"] { left: 78px; }
+            .key-black[data-note-index="6"] { left: 170px; }
+            .key-black[data-note-index="8"] { left: 216px; }
+            .key-black[data-note-index="10"] { left: 262px; }
+            
+            .key-black[data-note-index="13"] { left: 354px; }
+            .key-black[data-note-index="15"] { left: 400px; }
+            .key-black[data-note-index="18"] { left: 492px; }
+            .key-black[data-note-index="20"] { left: 538px; }
+            .key-black[data-note-index="22"] { left: 584px; }
+            
+            .key-black[data-note-index="25"] { left: 676px; }
+            .key-black[data-note-index="27"] { left: 722px; }
+            .key-black[data-note-index="30"] { left: 814px; }
+            .key-black[data-note-index="32"] { left: 860px; }
+            .key-black[data-note-index="34"] { left: 906px; }
+
+            .controls-panel {
+                gap: 1rem;
+                padding: 0.75rem 1rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .controls-panel {
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+            
+            .key-white .note-label,
+            .key-white .key-label,
+            .key-black .note-label,
+            .key-black .key-label {
+                font-size: 0.5rem;
+            }
+
+            .instruction-row {
+                font-size: 0.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Carregando samples de piano...</p>
+        <p class="loading-progress" id="loading-progress">0%</p>
+        <button class="start-btn" id="start-btn">🎹 Iniciar Piano</button>
+    </div>
+
+    <div class="container">
+        <h1>🎹 Piano Virtual</h1>
+        <p class="subtitle">Som de piano real com samples de alta qualidade</p>
+        
+        <div class="controls-panel">
+            <div class="control-group">
+                <span class="control-label">Exibir:</span>
+                <div class="toggle-wrapper">
+                    <span class="toggle-option active" id="label-notes">Notas</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-display">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-option" id="label-keys">Teclas</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <span class="control-label">Oitava:</span>
+                <div class="octave-control">
+                    <button class="octave-btn" id="octave-down" title="Oitava anterior (←)">−</button>
+                    <div class="octave-display" id="octave-display">C4</div>
+                    <button class="octave-btn" id="octave-up" title="Próxima oitava (→)">+</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <span class="control-label">Volume:</span>
+                <div class="volume-control">
+                    <span class="volume-icon">🔊</span>
+                    <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="70">
+                </div>
+            </div>
+        </div>
+
+        <div class="piano-container">
+            <div class="piano" id="piano">
+                <!-- Oitava 1: Teclas Brancas Z-M / Pretas S,D,G,H,J -->
+                <div class="key key-white" data-note-index="0" data-key="z">
+                    <span class="note-label">Dó</span>
+                    <span class="key-label">Z</span>
+                </div>
+                <div class="key key-white" data-note-index="2" data-key="x">
+                    <span class="note-label">Ré</span>
+                    <span class="key-label">X</span>
+                </div>
+                <div class="key key-white" data-note-index="4" data-key="c">
+                    <span class="note-label">Mi</span>
+                    <span class="key-label">C</span>
+                </div>
+                <div class="key key-white" data-note-index="5" data-key="v">
+                    <span class="note-label">Fá</span>
+                    <span class="key-label">V</span>
+                </div>
+                <div class="key key-white" data-note-index="7" data-key="b">
+                    <span class="note-label">Sol</span>
+                    <span class="key-label">B</span>
+                </div>
+                <div class="key key-white" data-note-index="9" data-key="n">
+                    <span class="note-label">Lá</span>
+                    <span class="key-label">N</span>
+                </div>
+                <div class="key key-white" data-note-index="11" data-key="m">
+                    <span class="note-label">Si</span>
+                    <span class="key-label">M</span>
+                </div>
+
+                <!-- Oitava 2: Teclas Brancas Q-U / Pretas 2,3,5,6,7 -->
+                <div class="key key-white" data-note-index="12" data-key="q">
+                    <span class="note-label">Dó</span>
+                    <span class="key-label">Q</span>
+                </div>
+                <div class="key key-white" data-note-index="14" data-key="w">
+                    <span class="note-label">Ré</span>
+                    <span class="key-label">W</span>
+                </div>
+                <div class="key key-white" data-note-index="16" data-key="e">
+                    <span class="note-label">Mi</span>
+                    <span class="key-label">E</span>
+                </div>
+                <div class="key key-white" data-note-index="17" data-key="r">
+                    <span class="note-label">Fá</span>
+                    <span class="key-label">R</span>
+                </div>
+                <div class="key key-white" data-note-index="19" data-key="t">
+                    <span class="note-label">Sol</span>
+                    <span class="key-label">T</span>
+                </div>
+                <div class="key key-white" data-note-index="21" data-key="y">
+                    <span class="note-label">Lá</span>
+                    <span class="key-label">Y</span>
+                </div>
+                <div class="key key-white" data-note-index="23" data-key="u">
+                    <span class="note-label">Si</span>
+                    <span class="key-label">U</span>
+                </div>
+
+                <!-- Oitava 3: Teclas Brancas I-. / Pretas 9,0,-,F,K -->
+                <div class="key key-white" data-note-index="24" data-key="i">
+                    <span class="note-label">Dó</span>
+                    <span class="key-label">I</span>
+                </div>
+                <div class="key key-white" data-note-index="26" data-key="o">
+                    <span class="note-label">Ré</span>
+                    <span class="key-label">O</span>
+                </div>
+                <div class="key key-white" data-note-index="28" data-key="p">
+                    <span class="note-label">Mi</span>
+                    <span class="key-label">P</span>
+                </div>
+                <div class="key key-white" data-note-index="29" data-key="[">
+                    <span class="note-label">Fá</span>
+                    <span class="key-label">[</span>
+                </div>
+                <div class="key key-white" data-note-index="31" data-key="]">
+                    <span class="note-label">Sol</span>
+                    <span class="key-label">]</span>
+                </div>
+                <div class="key key-white" data-note-index="33" data-key=",">
+                    <span class="note-label">Lá</span>
+                    <span class="key-label">,</span>
+                </div>
+                <div class="key key-white" data-note-index="35" data-key=".">
+                    <span class="note-label">Si</span>
+                    <span class="key-label">.</span>
+                </div>
+
+                <!-- Teclas Pretas - Oitava 1 (S, D, G, H, J) -->
+                <div class="key key-black" data-note-index="1" data-key="s">
+                    <span class="note-label">Dó#</span>
+                    <span class="key-label">S</span>
+                </div>
+                <div class="key key-black" data-note-index="3" data-key="d">
+                    <span class="note-label">Ré#</span>
+                    <span class="key-label">D</span>
+                </div>
+                <div class="key key-black" data-note-index="6" data-key="g">
+                    <span class="note-label">Fá#</span>
+                    <span class="key-label">G</span>
+                </div>
+                <div class="key key-black" data-note-index="8" data-key="h">
+                    <span class="note-label">Sol#</span>
+                    <span class="key-label">H</span>
+                </div>
+                <div class="key key-black" data-note-index="10" data-key="j">
+                    <span class="note-label">Lá#</span>
+                    <span class="key-label">J</span>
+                </div>
+
+                <!-- Teclas Pretas - Oitava 2 (2, 3, 5, 6, 7) -->
+                <div class="key key-black" data-note-index="13" data-key="2">
+                    <span class="note-label">Dó#</span>
+                    <span class="key-label">2</span>
+                </div>
+                <div class="key key-black" data-note-index="15" data-key="3">
+                    <span class="note-label">Ré#</span>
+                    <span class="key-label">3</span>
+                </div>
+                <div class="key key-black" data-note-index="18" data-key="5">
+                    <span class="note-label">Fá#</span>
+                    <span class="key-label">5</span>
+                </div>
+                <div class="key key-black" data-note-index="20" data-key="6">
+                    <span class="note-label">Sol#</span>
+                    <span class="key-label">6</span>
+                </div>
+                <div class="key key-black" data-note-index="22" data-key="7">
+                    <span class="note-label">Lá#</span>
+                    <span class="key-label">7</span>
+                </div>
+
+                <!-- Teclas Pretas - Oitava 3 (9, 0, -, F, K) -->
+                <div class="key key-black" data-note-index="25" data-key="9">
+                    <span class="note-label">Dó#</span>
+                    <span class="key-label">9</span>
+                </div>
+                <div class="key key-black" data-note-index="27" data-key="0">
+                    <span class="note-label">Ré#</span>
+                    <span class="key-label">0</span>
+                </div>
+                <div class="key key-black" data-note-index="30" data-key="-">
+                    <span class="note-label">Fá#</span>
+                    <span class="key-label">-</span>
+                </div>
+                <div class="key key-black" data-note-index="32" data-key="f">
+                    <span class="note-label">Sol#</span>
+                    <span class="key-label">F</span>
+                </div>
+                <div class="key key-black" data-note-index="34" data-key="k">
+                    <span class="note-label">Lá#</span>
+                    <span class="key-label">K</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <div class="instruction-row">
+                <span>Teclas brancas:</span>
+                <div class="keyboard-hint">
+                    <kbd>Z</kbd><kbd>X</kbd><kbd>C</kbd><kbd>V</kbd><kbd>B</kbd><kbd>N</kbd><kbd>M</kbd>
+                </div>
+                <span>|</span>
+                <div class="keyboard-hint">
+                    <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><kbd>T</kbd><kbd>Y</kbd><kbd>U</kbd>
+                </div>
+                <span>|</span>
+                <div class="keyboard-hint">
+                    <kbd>I</kbd><kbd>O</kbd><kbd>P</kbd><kbd>[</kbd><kbd>]</kbd><kbd>,</kbd><kbd>.</kbd>
+                </div>
+            </div>
+            <div class="instruction-row">
+                <span>Teclas pretas:</span>
+                <div class="keyboard-hint">
+                    <kbd>S</kbd><kbd>D</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd>
+                </div>
+                <span>|</span>
+                <div class="keyboard-hint">
+                    <kbd>2</kbd><kbd>3</kbd><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd>
+                </div>
+                <span>|</span>
+                <div class="keyboard-hint">
+                    <kbd>9</kbd><kbd>0</kbd><kbd>-</kbd><kbd>F</kbd><kbd>K</kbd>
+                </div>
+            </div>
+            <div class="instruction-row">
+                <span>Mudar oitava:</span>
+                <kbd>←</kbd><kbd>→</kbd>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // PIANO COM SAMPLES REAIS USANDO TONE.JS
+        // ========================================
+
+        // Elementos do DOM
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingProgress = document.getElementById('loading-progress');
+        const startBtn = document.getElementById('start-btn');
+        const keys = document.querySelectorAll('.key');
+        const toggle = document.getElementById('toggle-display');
+        const labelNotes = document.getElementById('label-notes');
+        const labelKeys = document.getElementById('label-keys');
+        const octaveDisplay = document.getElementById('octave-display');
+        const octaveUpBtn = document.getElementById('octave-up');
+        const octaveDownBtn = document.getElementById('octave-down');
+        const volumeSlider = document.getElementById('volume-slider');
+
+        // Configurações
+        let baseOctave = 3;
+        const MIN_OCTAVE = 1;
+        const MAX_OCTAVE = 5;
+        let masterVolume = -6; // em dB
+        let pianoSampler = null;
+        let isLoaded = false;
+
+        // Mapeamento de índice para nota
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+        // Converter índice da tecla para nome da nota
+        function getNoteFromIndex(noteIndex) {
+            const octave = baseOctave + Math.floor(noteIndex / 12) + 1;
+            const noteName = noteNames[noteIndex % 12];
+            return `${noteName}${octave}`;
+        }
+
+        // Inicializar o sampler de piano com Tone.js
+        async function initPiano() {
+            try {
+                // Usar o Salamander Piano samples (gratuito e de alta qualidade)
+                // Hospedado no servidor do Tone.js
+                pianoSampler = new Tone.Sampler({
+                    urls: {
+                        A0: "A0.mp3",
+                        C1: "C1.mp3",
+                        "D#1": "Ds1.mp3",
+                        "F#1": "Fs1.mp3",
+                        A1: "A1.mp3",
+                        C2: "C2.mp3",
+                        "D#2": "Ds2.mp3",
+                        "F#2": "Fs2.mp3",
+                        A2: "A2.mp3",
+                        C3: "C3.mp3",
+                        "D#3": "Ds3.mp3",
+                        "F#3": "Fs3.mp3",
+                        A3: "A3.mp3",
+                        C4: "C4.mp3",
+                        "D#4": "Ds4.mp3",
+                        "F#4": "Fs4.mp3",
+                        A4: "A4.mp3",
+                        C5: "C5.mp3",
+                        "D#5": "Ds5.mp3",
+                        "F#5": "Fs5.mp3",
+                        A5: "A5.mp3",
+                        C6: "C6.mp3",
+                        "D#6": "Ds6.mp3",
+                        "F#6": "Fs6.mp3",
+                        A6: "A6.mp3",
+                        C7: "C7.mp3",
+                        "D#7": "Ds7.mp3",
+                        "F#7": "Fs7.mp3",
+                        A7: "A7.mp3",
+                        C8: "C8.mp3"
+                    },
+                    release: 1,
+                    baseUrl: "https://tonejs.github.io/audio/salamander/",
+                    onload: () => {
+                        isLoaded = true;
+                        loadingProgress.textContent = "100%";
+                        startBtn.classList.add('show');
+                        document.querySelector('.loading-spinner').style.display = 'none';
+                        document.querySelector('.loading-text').textContent = 'Samples carregados!';
+                    }
+                }).toDestination();
+
+                // Simular progresso de carregamento
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    if (isLoaded) {
+                        clearInterval(progressInterval);
+                        return;
+                    }
+                    progress = Math.min(progress + Math.random() * 15, 95);
+                    loadingProgress.textContent = `${Math.round(progress)}%`;
+                }, 200);
+
+            } catch (error) {
+                console.error('Erro ao carregar samples:', error);
+                loadingProgress.textContent = 'Erro ao carregar';
+            }
+        }
+
+        // Iniciar o contexto de áudio (necessário para browsers modernos)
+        startBtn.addEventListener('click', async () => {
+            await Tone.start();
+            loadingOverlay.classList.add('hidden');
+        });
+
+        // Mapeamento de teclas do teclado
+        const keyMap = {};
+        keys.forEach(key => {
+            const keyBinding = key.dataset.key;
+            keyMap[keyBinding.toLowerCase()] = key;
+        });
+
+        // Notas ativas (para controle de sustain)
+        const activeNotes = new Map();
+
+        // Tocar nota
+        function playNote(noteIndex) {
+            if (!isLoaded || !pianoSampler) return;
+            
+            const noteName = getNoteFromIndex(noteIndex);
+            
+            // Se a nota já está tocando, para primeiro
+            if (activeNotes.has(noteIndex)) {
+                pianoSampler.triggerRelease(activeNotes.get(noteIndex));
+            }
+            
+            // Tocar a nova nota
+            pianoSampler.triggerAttack(noteName, Tone.now());
+            activeNotes.set(noteIndex, noteName);
+        }
+
+        // Parar nota (com release natural do sample)
+        function stopNote(noteIndex) {
+            if (!isLoaded || !pianoSampler) return;
+            
+            const noteName = activeNotes.get(noteIndex);
+            if (noteName) {
+                pianoSampler.triggerRelease(noteName, Tone.now());
+                activeNotes.delete(noteIndex);
+            }
+        }
+
+        // Atualizar display da oitava
+        function updateOctaveDisplay() {
+            octaveDisplay.textContent = `C${baseOctave + 1}`;
+            octaveDownBtn.disabled = baseOctave <= MIN_OCTAVE;
+            octaveUpBtn.disabled = baseOctave >= MAX_OCTAVE;
+        }
+
+        // Mudar oitava
+        function changeOctave(delta) {
+            const newOctave = baseOctave + delta;
+            if (newOctave >= MIN_OCTAVE && newOctave <= MAX_OCTAVE) {
+                // Parar todas as notas ativas antes de mudar oitava
+                activeNotes.forEach((noteName, noteIndex) => {
+                    pianoSampler.triggerRelease(noteName);
+                });
+                activeNotes.clear();
+                
+                baseOctave = newOctave;
+                updateOctaveDisplay();
+            }
+        }
+
+        octaveUpBtn.addEventListener('click', () => changeOctave(1));
+        octaveDownBtn.addEventListener('click', () => changeOctave(-1));
+
+        // Volume
+        volumeSlider.addEventListener('input', (e) => {
+            // Converter 0-100 para -40dB a 0dB
+            const value = e.target.value;
+            masterVolume = value === '0' ? -Infinity : (value / 100) * 40 - 40;
+            if (pianoSampler) {
+                pianoSampler.volume.value = masterVolume;
+            }
+        });
+
+        // Ativar tecla
+        function activateKey(keyElement) {
+            if (!keyElement || keyElement.classList.contains('active')) return;
+            
+            keyElement.classList.add('active');
+            const noteIndex = parseInt(keyElement.dataset.noteIndex);
+            playNote(noteIndex);
+        }
+
+        // Desativar tecla
+        function deactivateKey(keyElement) {
+            if (!keyElement || !keyElement.classList.contains('active')) return;
+            keyElement.classList.remove('active');
+            
+            const noteIndex = parseInt(keyElement.dataset.noteIndex);
+            stopNote(noteIndex);
+        }
+
+        // Eventos de mouse/touch
+        keys.forEach(key => {
+            key.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                activateKey(key);
+            });
+            
+            key.addEventListener('mouseup', () => deactivateKey(key));
+            key.addEventListener('mouseleave', () => deactivateKey(key));
+
+            key.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                activateKey(key);
+            });
+            
+            key.addEventListener('touchend', () => deactivateKey(key));
+        });
+
+        // Eventos de teclado
+        const pressedKeys = new Set();
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                changeOctave(-1);
+                return;
+            }
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                changeOctave(1);
+                return;
+            }
+
+            const key = e.key.toLowerCase();
+            
+            if (pressedKeys.has(key)) return;
+            pressedKeys.add(key);
+            
+            const keyElement = keyMap[key];
+            if (keyElement) {
+                e.preventDefault();
+                activateKey(keyElement);
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            pressedKeys.delete(key);
+            
+            const keyElement = keyMap[key];
+            if (keyElement) {
+                deactivateKey(keyElement);
+            }
+        });
+
+        // Toggle notas/teclas
+        function updateLabels() {
+            const showKeys = toggle.checked;
+            
+            labelNotes.classList.toggle('active', !showKeys);
+            labelKeys.classList.toggle('active', showKeys);
+            
+            keys.forEach(key => {
+                const noteLabel = key.querySelector('.note-label');
+                const keyLabel = key.querySelector('.key-label');
+                
+                if (showKeys) {
+                    noteLabel.style.display = 'none';
+                    keyLabel.style.display = 'block';
+                } else {
+                    noteLabel.style.display = 'block';
+                    keyLabel.style.display = 'block';
+                }
+            });
+        }
+
+        toggle.addEventListener('change', updateLabels);
+
+        // Prevenir scroll
+        window.addEventListener('keydown', (e) => {
+            if (keyMap[e.key.toLowerCase()] || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+            }
+        });
+
+        // Inicializar
+        updateOctaveDisplay();
+        initPiano();
+    </script>
+</body>
+</html>
