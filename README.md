@@ -22,7 +22,7 @@ Um piano virtual interativo com sons de piano real, desenvolvido com HTML, CSS, 
 
 ## 🚀 Demonstração
 
-[**Experimente o Piano Virtual ao vivo**](https://pietronozella.github.io/PianoVirtual/)
+[**Experimente o Piano Virtual ao vivo**](https://piano-virtual-orpin.vercel.app/)
 
 ## 🎮 Como Usar
 
